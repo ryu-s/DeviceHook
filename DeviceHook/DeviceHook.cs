@@ -18,6 +18,37 @@ namespace ryu_s.DeviceHook
         internal const int WH_KEYBOARD_LL = 13;
         protected const int WM_KEYDOWN = 0x0100;
         protected const int WM_KEYUP = 0x0101;
+
+        protected const int WM_NCMOUSEMOVE = 0x00A0;
+        protected const int WM_NCLBUTTONDOWN = 0x00A1;
+        protected const int WM_NCLBUTTONUP = 0x00A2;
+        protected const int WM_NCLBUTTONDBLCLK = 0x00A3;
+        protected const int WM_NCRBUTTONDOWN = 0x00A4;
+        protected const int WM_NCRBUTTONUP = 0x00A5;
+        protected const int WM_NCRBUTTONDBLCLK = 0x00A6;
+        protected const int WM_NCMBUTTONDOWN = 0x00A7;
+        protected const int WM_NCMBUTTONUP = 0x00A8;
+        protected const int WM_NCMBUTTONDBLCLK = 0x00A9;
+        protected const int WM_NCXBUTTONDOWN = 0x00AB;
+        protected const int WM_NCXBUTTONUP = 0x00AC;
+        protected const int WM_NCXBUTTONDBLCLK = 0x00AD;
+
+        protected const int WM_MOUSEMOVE = 0x0200;
+        protected const int WM_LBUTTONDOWN = 0x0201;
+        protected const int WM_LBUTTONUP = 0x0202;
+        protected const int WM_LBUTTONDBLCLK = 0x0203;
+        protected const int WM_RBUTTONDOWN = 0x0204;
+        protected const int WM_RBUTTONUP = 0x0205;
+        protected const int WM_RBUTTONDBLCLK = 0x0206;
+        protected const int WM_MBUTTONDOWN = 0x0207;
+        protected const int WM_MBUTTONUP = 0x0208;
+        protected const int WM_MBUTTONDBLCLK = 0x0209;
+        protected const int WM_MOUSEWHEEL = 0x020A;
+        protected const int WM_XBUTTONDOWN = 0x020B;
+        protected const int WM_XBUTTONUP = 0x020C;
+        protected const int WM_XBUTTONDBLCLK = 0x020D;
+        protected const int WM_MOUSEHWHEEL = 0x020E;
+
         private delegate int HookProc(int nCode, IntPtr wParam, IntPtr lParam);
         /// <summary>
         /// 
@@ -25,23 +56,33 @@ namespace ryu_s.DeviceHook
         /// <param name="idHook"></param>
         /// <param name="lpfn"></param>
         /// <param name="hInstance"></param>
-        /// <param name="threadId"></param>
+        /// <param name="threadId">フックしたいスレッドのID。0だと全て。</param>
         /// <returns>If the function succeeds, the return value is the handle to the hook procedure</returns>
-        [DllImport("user32.dll", EntryPoint = "SetWindowsHookEx", CharSet = CharSet.Auto, CallingConvention = CallingConvention.StdCall)]
+        [DllImport("user32.dll", EntryPoint = "SetWindowsHookEx", SetLastError = true, CharSet = CharSet.Auto, CallingConvention = CallingConvention.StdCall)]
         private static extern int _setWindowsHookEx(int idHook, HookProc lpfn,
         IntPtr hInstance, int threadId);
 
         [DllImport("user32.dll", EntryPoint = "UnhookWindowsHookEx", CharSet = CharSet.Auto,
          CallingConvention = CallingConvention.StdCall)]
         private static extern bool _unhookWindowsHookEx(int idHook);
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="idHook">This parameter is ignored.</param>
+        /// <param name="nCode"></param>
+        /// <param name="wParam"></param>
+        /// <param name="lParam"></param>
+        /// <returns></returns>
         [DllImport("user32.dll", EntryPoint = "CallNextHookEx", CharSet = CharSet.Auto, CallingConvention = CallingConvention.StdCall)]
-        private static extern int _callNextHookEx(int idHook, int nCode,
+        private static extern int CallNextHookEx(int idHook, int nCode,
         IntPtr wParam, IntPtr lParam);
+
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
         private static extern IntPtr GetModuleHandle(string lpModuleName);
 
         int procHandle = 0;
+        public bool IsListening { get { return (procHandle != 0); } }
         protected void SetWindowsHookEx(int idHook)
         {
             if (procHandle != 0)
@@ -53,7 +94,7 @@ namespace ryu_s.DeviceHook
                 procHandle = _setWindowsHookEx(idHook, new HookProc(HookProcedure), hModule, 0);
                 if (procHandle == 0)
                 {
-                    Debug.WriteLine("fail");
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
                 }
             }
         }
@@ -65,18 +106,20 @@ namespace ryu_s.DeviceHook
             procHandle = 0;
             return b;
         }
-        protected abstract void Hook(int nCode, IntPtr wParam, IntPtr lParam);
+        const int HC_ACTION = 0;
+        protected abstract void Hook(IntPtr wParam, IntPtr lParam);
         private int HookProcedure(int nCode, IntPtr wParam, IntPtr lParam)
         {
             if (nCode < 0)
             {
-                //何もせずにすぐにCallNextHookExを呼ばないといけない。
-                return _callNextHookEx(0, nCode, wParam, lParam);
+                //If nCode is less than zero, the hook procedure must pass the message to the CallNextHookEx function 
+                //without further processing and should return the value returned by CallNextHookEx. 
+                return CallNextHookEx(0, nCode, wParam, lParam);
             }
             else
             {
-                Hook(nCode, wParam, lParam);
-                return _callNextHookEx(0, nCode, wParam, lParam);
+                Hook(wParam, lParam);
+                return CallNextHookEx(0, nCode, wParam, lParam);
             }
         }
         ~DeviceHook()
@@ -147,8 +190,11 @@ namespace ryu_s.DeviceHook
         protected virtual void KeyStateChanged(KeyEventType type, Keys key)
         {
         }
-        protected override void Hook(int nCode, IntPtr wParam, IntPtr lParam)
+        protected override void Hook(IntPtr wParam, IntPtr lParam)
         {
+            //System.Windows.Forms.Keysを使うと、ShiftやControl等のLとRがあるキーを区別しない。
+
+            //wParam=WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, or WM_SYSKEYUP            
             var kb = (KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(KBDLLHOOKSTRUCT));
             var type = KeyEventType.Down;
             if ((int)wParam == WM_KEYDOWN)
@@ -159,7 +205,6 @@ namespace ryu_s.DeviceHook
                     isPressingControl = true;
                 else if (kb.vkCode == vk_lmenu || kb.vkCode == vk_rmenu)
                     isPressingAlt = true;
-//                Console.WriteLine(string.Format("{0}, shift={1}, control={2}, alt={3}", key.ToString(), isPressingShift, isPressingControl, isPressingAlt));
                 type = KeyEventType.Down;
             }
             else if ((int)wParam == WM_KEYUP)
@@ -184,23 +229,176 @@ namespace ryu_s.DeviceHook
             if (isPressingShift)
                 key &= Keys.Shift;
             KeyStateChanged(type, key);
-
-//            Console.WriteLine(nCode);
         }
     }
-    public class MouseHook : DeviceHook
+    public sealed class GlobalMouseHook : DeviceHook
     {
+        public event MouseEventHandler MouseMove;
+        public event MouseEventHandler MouseDown;
+        public event MouseEventHandler MouseUp;
+        //        public event MouseEventHandler MouseClick;
+        public event MouseEventHandler MouseDClick;
+        public event MouseEventHandler MouseWheel;
+        public event MouseEventHandler MouseHWheel;
+
+
+        [StructLayout(LayoutKind.Sequential)]
+        private class POINT
+        {
+            public int x;
+            public int y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private class MouseHookStruct
+        {
+            public POINT pt;
+            public int hwnd;
+            public int wHitTestCode;
+            public int dwExtraInfo;
+        }
+        [StructLayout(LayoutKind.Sequential)]
+        struct MouseHookStructEx
+        {
+
+            public MouseHookStruct mouseHookStruct;
+            public int MouseData;
+        }
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MSLLHOOKSTRUCT
+        {
+            public POINT pt;
+            public int mouseData;
+            public int flags;
+            public int time;
+            public UIntPtr dwExtraInfo;
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns>milliseconds</returns>
+        [DllImport("user32.dll")]
+        private static extern uint GetDoubleClickTime();
+        private System.Timers.Timer timer;
         public void Regist()
         {
             SetWindowsHookEx(WH_MOUSE_LL);
+            timer = new System.Timers.Timer
+            {
+                Interval = GetDoubleClickTime(),
+                AutoReset = false,
+            };
+            timer.Elapsed += timer_Elapsed;
+            MouseDown += MouseHook_MouseDown;
+        }
+
+        void MouseHook_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button.Equals(lastClickedButton))
+            {
+                OnEvent(MouseDClick, e.Button, 2, e.X, e.Y, e.Delta);
+                lastClickedButton = MouseButtons.None;
+            }
+            else
+            {
+                timer.Stop();
+                timer.Start();
+                lastClickedButton = e.Button;
+            }
+        }
+
+        void timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            lastClickedButton = MouseButtons.None;
         }
         public void Unregist()
         {
             UnhookWindowsHookEx();
         }
-        protected override void Hook(int nCode, IntPtr wParam, IntPtr lParam)
+        private void OnEvent(MouseEventHandler e, MouseButtons buttons, int clicks, int x, int y, int delta)
         {
-            Console.WriteLine(nCode);
+            var args = new MouseEventArgs(buttons, clicks, x, y, delta);
+            if (e != null)
+                e(this, args);
+        }
+        private int lastBDownX;
+        private int lastBDownY;
+        private MouseButtons lastClickedButton = MouseButtons.None;
+        const int XBUTTON1 = 1;
+        const int XBUTTON2 = 2;
+        protected override void Hook(IntPtr wParam, IntPtr lParam)
+        {
+            var mouseHookStructEx = (MouseHookStructEx)Marshal.PtrToStructure(lParam, typeof(MouseHookStructEx));
+            var mouseHookStruct = mouseHookStructEx.mouseHookStruct;
+            var msLlHookStruct = (MSLLHOOKSTRUCT)Marshal.PtrToStructure((IntPtr)lParam, typeof(MSLLHOOKSTRUCT));
+            var currentX = mouseHookStruct.pt.x;
+            var currentY = mouseHookStruct.pt.y;
+
+            switch ((int)wParam)
+            {
+                case WM_MOUSEMOVE:
+                    OnEvent(MouseMove, MouseButtons.None, 0, currentX, currentY, 0);
+                    break;
+                case WM_LBUTTONDOWN:
+                    lastBDownX = currentX;
+                    lastBDownY = currentY;
+                    OnEvent(MouseDown, MouseButtons.Left, 1, currentX, currentY, 0);
+                    break;
+                case WM_LBUTTONUP:
+                    OnEvent(MouseUp, MouseButtons.Left, 1, currentX, currentY, 0);
+                    break;
+                case WM_RBUTTONDOWN:
+                    lastBDownX = currentX;
+                    lastBDownY = currentY;
+                    OnEvent(MouseDown, MouseButtons.Right, 1, currentX, currentY, 0);
+                    break;
+                case WM_RBUTTONUP:
+                    OnEvent(MouseUp, MouseButtons.Right, 1, currentX, currentY, 0);
+                    break;
+                case WM_MBUTTONDOWN:
+                    lastBDownX = currentX;
+                    lastBDownY = currentY;
+                    OnEvent(MouseDown, MouseButtons.Middle, 1, currentX, currentY, 0);
+                    break;
+                case WM_MBUTTONUP:
+                    OnEvent(MouseUp, MouseButtons.Middle, 1, currentX, currentY, 0);
+                    break;
+                case WM_MOUSEWHEEL:
+                    {
+                        var delta = (short)((msLlHookStruct.mouseData >> 16) & 0xFFFF);
+                        OnEvent(MouseWheel, MouseButtons.None, 0, currentX, currentY, delta);
+                    }
+                    break;
+                case WM_MOUSEHWHEEL:
+                    {
+                        var delta = (short)((msLlHookStruct.mouseData >> 16) & 0xFFFF);
+                        OnEvent(MouseHWheel, MouseButtons.None, 0, currentX, currentY, delta);
+                    }
+                    break;
+                case WM_XBUTTONDOWN:
+                    {
+                        lastBDownX = currentX;
+                        lastBDownY = currentY;
+                        var x = (msLlHookStruct.mouseData >> 16);
+                        if (x == XBUTTON1)
+                            OnEvent(MouseDown, MouseButtons.XButton1, 1, currentX, currentY, 0);
+                        else if (x == XBUTTON2)
+                            OnEvent(MouseDown, MouseButtons.XButton2, 1, currentX, currentY, 0);
+                    }
+                    break;
+                case WM_XBUTTONUP:
+                    {
+                        var x = (msLlHookStruct.mouseData >> 16);
+                        if (x == XBUTTON1)
+                            OnEvent(MouseUp, MouseButtons.XButton1, 1, currentX, currentY, 0);
+                        else if (x == XBUTTON2)
+                            OnEvent(MouseUp, MouseButtons.XButton2, 1, currentX, currentY, 0);
+                    }
+                    break;
+                default:
+                    Debug.WriteLine("unknown wParam:" + (int)wParam);
+                    break;
+            }
         }
     }
     public class MyKeyEventArgs : EventArgs
@@ -225,6 +423,11 @@ namespace ryu_s.DeviceHook
         {
             listeningKeys.Add(new KeyValuePair<KeyEventType, Keys>(type, key));
         }
+        public void Remove(KeyEventType type, Keys key)
+        {
+            listeningKeys.Remove(new KeyValuePair<KeyEventType, Keys>(type, key));
+        }
+
         protected override void KeyStateChanged(KeyboardHook.KeyEventType type, Keys key)
         {
             base.KeyStateChanged(type, key);
