@@ -52,6 +52,9 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <EmbeddedResource Include="Form1.resx">
+      <DependentUpon>Form1.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
@@ -78,6 +81,10 @@
     <ProjectReference Include="..\DeviceHook\DeviceHook.csproj">
       <Project>{449e3f90-b21b-414b-a64b-62889e6ca536}</Project>
       <Name>DeviceHook</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Macro\Macro.csproj">
+      <Project>{0e2fc1e9-a2fe-4455-8bc0-874129df0afe}</Project>
+      <Name>Macro</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

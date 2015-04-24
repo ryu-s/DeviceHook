@@ -11,6 +11,10 @@ using System.Diagnostics;
 using System.Windows.Forms;
 namespace ryu_s.DeviceHook
 {
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <remarks>出来るのは恐らくモニタリングだけ。動作をシミュレートしたりするのは別クラスで。</remarks>
     public abstract class DeviceHook : IDisposable
     {
         protected const int WH_MOUSE = 7;
@@ -76,7 +80,6 @@ namespace ryu_s.DeviceHook
         [DllImport("user32.dll", EntryPoint = "CallNextHookEx", CharSet = CharSet.Auto, CallingConvention = CallingConvention.StdCall)]
         private static extern int CallNextHookEx(int idHook, int nCode,
         IntPtr wParam, IntPtr lParam);
-
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
         private static extern IntPtr GetModuleHandle(string lpModuleName);

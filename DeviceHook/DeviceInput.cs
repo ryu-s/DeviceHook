@@ -8,6 +8,7 @@ using System.Drawing;
 using System.Data;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Windows.Forms;
 namespace ryu_s.DeviceHook
 {
     public class DeviceInputApi
@@ -32,6 +33,17 @@ namespace ryu_s.DeviceHook
             Vertical,
             Horizontal,
         }
+        public enum MouseMoveType
+        {
+            Move,
+            Wheel,
+            HWheel,
+        }
+        public enum ActionType
+        {
+            Down,
+            Up,
+        }
         public static void PressKeyTest()
         {
         }
@@ -53,6 +65,120 @@ namespace ryu_s.DeviceHook
                 u.mi.dwFlags = MOUSEEVENTF.WHEEL;
             var input = new INPUT() { type = INPUT_TYPE.INPUT_MOUSE, U = u };
             SendInput(new INPUT[] { input });
+        }
+        public static void MoveMouse(int x, int y)
+        {
+            var virtualScreen = System.Windows.Forms.SystemInformation.VirtualScreen;
+            Int32 _x = Convert.ToInt32((x - virtualScreen.Left) * 65536 / virtualScreen.Width);
+            Int32 _y = Convert.ToInt32((y - virtualScreen.Top) * 65536 / virtualScreen.Height);
+
+            var u = new InputUnion();
+            u.mi.dwFlags = MOUSEEVENTF.MOVE | MOUSEEVENTF.VIRTUALDESK | MOUSEEVENTF.ABSOLUTE;
+            u.mi.dx = _x;
+            u.mi.dy = _y;
+            var input = new INPUT() { type = INPUT_TYPE.INPUT_MOUSE, U = u };
+
+            SendInput(new []{ input });
+        }
+        public static void ActionMouseButton(MouseButtons button, ActionType _type, int x, int y)
+        {
+            var list = new List<MOUSEEVENTF>();
+            int mouseData = 0;
+
+            if (button == MouseButtons.Left)
+            {
+                if (_type == ActionType.Down)
+                    list.Add(MOUSEEVENTF.LEFTDOWN);
+                else if (_type == ActionType.Up)
+                    list.Add(MOUSEEVENTF.LEFTUP);
+            }
+            else if (button == MouseButtons.Right)
+            {
+                if (_type == ActionType.Down)
+                    list.Add(MOUSEEVENTF.RIGHTDOWN);
+                else if (_type == ActionType.Up)
+                    list.Add(MOUSEEVENTF.RIGHTUP);
+            }
+            else if (button == MouseButtons.XButton1 || button == MouseButtons.XButton2)
+            {
+                if (button == MouseButtons.XButton1)
+                    mouseData = 1;
+                else if (button == MouseButtons.XButton2)
+                    mouseData = 2;
+                if (_type == ActionType.Down)
+                    list.Add(MOUSEEVENTF.XDOWN);
+                else if (_type == ActionType.Up)
+                    list.Add(MOUSEEVENTF.XUP);
+            }
+
+            var inputList = new List<INPUT>();
+            foreach (var eventF in list)
+            {
+                var u = new InputUnion();
+                u.mi.dwFlags = eventF;
+                u.mi.mouseData = mouseData;
+                inputList.Add(new INPUT() { type = INPUT_TYPE.INPUT_MOUSE, U = u });
+            }
+            if (inputList.Count > 0)
+                SendInput(inputList);
+        }
+        public static void ActionMouseButton(MouseClickButtonType type, int x, int y)
+        {
+            var list = new List<MOUSEEVENTF>();
+            switch (type)
+            {
+                case MouseClickButtonType.Left:
+                    list.Add(MOUSEEVENTF.LEFTDOWN);
+                    list.Add(MOUSEEVENTF.LEFTUP);
+                    break;
+                case MouseClickButtonType.LeftDown:
+                    list.Add(MOUSEEVENTF.LEFTDOWN);
+                    break;
+                case MouseClickButtonType.LeftUp:
+                    list.Add(MOUSEEVENTF.LEFTUP);
+                    break;
+                case MouseClickButtonType.Right:
+                    list.Add(MOUSEEVENTF.RIGHTDOWN);
+                    list.Add(MOUSEEVENTF.RIGHTUP);
+                    break;
+                case MouseClickButtonType.RightDown:
+                    list.Add(MOUSEEVENTF.RIGHTDOWN);
+                    break;
+                case MouseClickButtonType.RightUp:
+                    list.Add(MOUSEEVENTF.RIGHTUP);
+                    break;
+                case MouseClickButtonType.Middle:
+                    list.Add(MOUSEEVENTF.MIDDLEDOWN);
+                    list.Add(MOUSEEVENTF.MIDDLEUP);
+                    break;
+                case MouseClickButtonType.MiddleDown:
+                    list.Add(MOUSEEVENTF.MIDDLEDOWN);
+                    break;
+                case MouseClickButtonType.MiddleUp:
+                    list.Add(MOUSEEVENTF.MIDDLEUP);
+                    break;
+                case MouseClickButtonType.X:
+                    list.Add(MOUSEEVENTF.XDOWN);
+                    list.Add(MOUSEEVENTF.XUP);
+                    break;
+                case MouseClickButtonType.XDown:
+                    list.Add(MOUSEEVENTF.XDOWN);
+                    break;
+                case MouseClickButtonType.XUp:
+                    list.Add(MOUSEEVENTF.XUP);
+                    break;
+            }
+            var inputList = new List<INPUT>();
+            foreach (var eventF in list)
+            {
+                var u = new InputUnion();
+                u.mi.dwFlags = eventF | MOUSEEVENTF.ABSOLUTE;
+                u.mi.dx = x;
+                u.mi.dy = y;
+                inputList.Add(new INPUT() { type = INPUT_TYPE.INPUT_MOUSE, U = u });
+            }
+            if (inputList.Count > 0)
+                SendInput(inputList);
         }
         /// <summary>
         /// マウスボタンのクリックをシミュレート
@@ -166,7 +292,7 @@ namespace ryu_s.DeviceHook
             internal int dx;
             internal int dy;
             /// <summary>
-            /// dwFlagsがWHEELもしくはHWHEELだったらWheelを動かす量。それ以外は0にする。
+            /// dwFlagsがWHEELもしくはHWHEELだったらWheelを動かす量。XDOWNもしくはXUPだったらXBUTTON1なのかXBUTTON2なのか。それ以外は0にする。
             /// </summary>
             internal int mouseData;
             internal MOUSEEVENTF dwFlags;
@@ -1101,5 +1227,7 @@ namespace ryu_s.DeviceHook
             var n = _sendInput((uint)Inputs.Count(), Inputs.ToArray(), Marshal.SizeOf(typeof(INPUT)));
             return n;
         }
+
+
     }
 }
