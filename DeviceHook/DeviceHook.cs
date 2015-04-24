@@ -54,6 +54,7 @@ namespace ryu_s.DeviceHook
         protected const int WM_MOUSEHWHEEL = 0x020E;
 
         private delegate int HookProc(int nCode, IntPtr wParam, IntPtr lParam);
+        private HookProc procHolder;
         /// <summary>
         /// 
         /// </summary>
@@ -94,7 +95,8 @@ namespace ryu_s.DeviceHook
             using (var module = process.MainModule)
             {
                 var hModule = GetModuleHandle(module.ModuleName);
-                procHandle = _setWindowsHookEx(idHook, new HookProc(HookProcedure), hModule, 0);
+                procHolder = new HookProc(HookProcedure);
+                procHandle = _setWindowsHookEx(idHook, procHolder, hModule, 0);
                 if (procHandle == 0)
                 {
                     throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -106,6 +108,10 @@ namespace ryu_s.DeviceHook
             if (procHandle == 0)
                 return false;
             var b = _unhookWindowsHookEx(procHandle);
+
+            //ここに到達するまでにガベージコレクションされるのを避けるためにわざといじる。
+            if (procHolder != null)
+                procHolder = null;
             procHandle = 0;
             return b;
         }
@@ -319,10 +325,13 @@ namespace ryu_s.DeviceHook
             UnhookWindowsHookEx();
         }
         private void OnEvent(MouseEventHandler e, MouseButtons buttons, int clicks, int x, int y, int delta)
-        {
+        {            
             var args = new MouseEventArgs(buttons, clicks, x, y, delta);
             if (e != null)
+            {
+                Debug.WriteLine("{0} {1} {2} {3} {4} {5}", e.ToString(), buttons.ToString(), clicks, x, y, delta);
                 e(this, args);
+            }
         }
         private int lastBDownX;
         private int lastBDownY;
