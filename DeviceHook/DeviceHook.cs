@@ -329,7 +329,7 @@ namespace ryu_s.DeviceHook
             var args = new MouseEventArgs(buttons, clicks, x, y, delta);
             if (e != null)
             {
-                Debug.WriteLine("{0} {1} {2} {3} {4} {5}", e.ToString(), buttons.ToString(), clicks, x, y, delta);
+//                Debug.WriteLine("{0} {1} {2} {3} {4} {5}", e.ToString(), buttons.ToString(), clicks, x, y, delta);
                 e(this, args);
             }
         }

@@ -13,9 +13,10 @@ namespace ryu_s.Macro
     public interface ICommand
     {
         void DoWork();
+        IEnumerable<ICommand> GetChildren();
     }
 
-    public class Wait : ICommand
+    public sealed class Wait : ICommand
     {
         int waitTime;
         public Wait(int milliseconds)
@@ -30,8 +31,22 @@ namespace ryu_s.Macro
         {
             return string.Format("WAIT {0}", waitTime);
         }
+        public static ICommand Parse(string line)
+        {
+            var match0 = Regex.Match(line, "^WAIT (?<time>[0-9]+)$", RegexOptions.IgnoreCase);
+            if (match0.Success)
+            {
+                var milli = int.Parse(match0.Groups["time"].Value);
+                return new Wait(milli);
+            }
+            return new ParseError(line);
+        }
+        public IEnumerable<ICommand> GetChildren()
+        {
+            return new List<ICommand>();
+        }
     }
-    public class Mouse : ICommand
+    public sealed class Mouse : ICommand
     {
         string s = "";
         public class MouseAction
@@ -41,7 +56,7 @@ namespace ryu_s.Macro
             }
         }
         bool bMove = false;
-        DeviceInputApi.MouseMoveType _moveType;
+        //        DeviceInputApi.MouseMoveType _moveType;
         public Mouse(int x, int y)
         {
             bMove = true;
@@ -73,7 +88,7 @@ namespace ryu_s.Macro
         }
         public void DoWork()
         {
-            Console.WriteLine(_button.ToString());
+            //            Console.WriteLine(_button.ToString());
             if (bMove)
             {
                 DeviceInputApi.MoveMouse(_x, _y);
@@ -92,141 +107,14 @@ namespace ryu_s.Macro
         {
             return s;
         }
-    }
-    public class Keyboard : ICommand
-    {
-        public Keyboard(int vKey, DeviceInputApi.ActionType type)
+        public IEnumerable<ICommand> GetChildren()
         {
+            return new List<ICommand>();
         }
-        public void DoWork()
-        {
 
-        }
-    }
-    public class Nop : ICommand
-    {
-        public Nop()
+        public static ICommand Parse(string line)
         {
-        }
-        public void DoWork()
-        {
-        }
-        public override string ToString()
-        {
-            return "NOP";
-        }
-    }
-    public class ParseError : Nop
-    {
-        string _str;
-        public ParseError(string str)
-        {
-            _str = str;
-        }
-        public override string ToString()
-        {
-            return string.Format("ParseError({0})", _str);
-        }
-    }
-    public class CommandFile : ICommand
-    {
-        string _filePath;
-        public CommandFile(string filePath)
-        {
-            _filePath = filePath;
-        }
-        public void DoWork()
-        {
-            string s = "";
-            using (var sr = new StreamReader(_filePath))
-            {
-                s = sr.ReadToEnd();
-            }
-            var lines = s.Split(new [] { Environment.NewLine }, StringSplitOptions.None);
-            var commands = Macro.TextParser(lines);
-            foreach (var command in commands)
-            {
-                command.DoWork();
-            }
-        }
-        public override string ToString()
-        {
-            return string.Format("COMMANDFILE {0}");
-        }
-    }
-    public class CommandTimes : ICommand
-    {
-        ICommand _command;
-        long n;
-        public CommandTimes(ICommand command, long times)
-        {
-            _command = command;
-            n = times;
-        }
-        public void DoWork()
-        {
-            for (int i = 0; i < n; i++)
-            {
-                _command.DoWork();
-            }
-        }
-    }
-    public class Comment : Nop
-    {
-        string _comment;
-        public Comment(string comment)
-        {
-            _comment = comment;
-        }
-        public override string ToString()
-        {
-            return string.Format("//{0}", _comment);
-        }
-    }
-    public class Macro
-    {
-        IEnumerable<ICommand> _commands;
-        public Macro(IEnumerable<ICommand> commands)
-        {
-            _commands = commands;
-        }
-        public static IEnumerable<ICommand> TextParser(IEnumerable<string> multiLines)
-        {
-            var _commands = new List<ICommand>();
-            ICommand lastCommand = new Nop();
-            foreach (var line in multiLines)
-            {
-                var command = Macro.TextParser(line, lastCommand);
-                _commands.Add(command);
-                lastCommand = command;
-            }
-            return _commands;
-        }
-        public static ICommand TextParser(string line, ICommand lastCommand)
-        {
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                return new Nop();
-            }
-            var match000 = Regex.Match(line, "^//(?<comment>.*)$");
-            if (match000.Success)
-            {
-                var comment = match000.Groups["comment"].Value;
-                return new Comment(comment);
-            }
-            var match00 = Regex.Match(line, "^(?<times>[0-9]+)$");
-            if (match00.Success)
-            {
-                var times = long.Parse(match00.Groups["times"].Value);
-                return new CommandTimes(lastCommand, times);
-            }
-            var match0 = Regex.Match(line, "^WAIT (?<time>[0-9]+)$", RegexOptions.IgnoreCase);
-            if (match0.Success)
-            {
-                var milli = int.Parse(match0.Groups["time"].Value);
-                return new Wait(milli);
-            }
-            var match1 = Regex.Match(line, "^MOUSE_(?<button>[a-zA-Z]+)_(?<type>[a-zA-Z]+) (?<x>[-0-9]+) (?<y>[-0-9]+)$");
+            var match1 = Regex.Match(line, "^MOUSE_(?<button>[a-zA-Z]+)_(?<type>[a-zA-Z]+) (?<x>[-0-9]+) (?<y>[-0-9]+)$", RegexOptions.IgnoreCase);
             if (match1.Success)
             {
                 var buttonStr = match1.Groups["button"].Value;
@@ -274,21 +162,238 @@ namespace ryu_s.Macro
                 var amount = int.Parse(match2.Groups["amount"].Value);
                 return new Mouse(DeviceInputApi.MouseWheelType.Vertical, amount);
             }
+        ERROR:
+            return new ParseError(line);
+        }
+    }
+    public sealed class Keyboard : ICommand
+    {
+        public Keyboard(int vKey, DeviceInputApi.ActionType type)
+        {
+        }
+        public void DoWork()
+        {
+
+        }
+        public IEnumerable<ICommand> GetChildren()
+        {
+            return new List<ICommand>();
+        }
+    }
+    public class Nop : ICommand
+    {
+        public Nop()
+        {
+        }
+        public void DoWork()
+        {
+        }
+        public override string ToString()
+        {
+            return "NOP";
+        }
+        public IEnumerable<ICommand> GetChildren()
+        {
+            return new List<ICommand>();
+        }
+        public static ICommand Parse(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return new Nop();
+            }
+            return new ParseError(line);
+        }
+    }
+    public sealed class ParseError : ICommand
+    {
+        string _str;
+        public ParseError(string str)
+        {
+            _str = str;
+        }
+        public void DoWork()
+        {
+        }
+        public IEnumerable<ICommand> GetChildren()
+        {
+            return new List<ICommand>();
+        }
+        public override string ToString()
+        {
+            return string.Format("ParseError(\"{0}\")", _str);
+        }
+    }
+    public sealed class CommandFile : ICommand
+    {
+        string _filePath;
+        IEnumerable<ICommand> _commands;
+        public CommandFile(string filePath)
+        {
+            _filePath = filePath;
+
+            string s = "";
+            using (var sr = new StreamReader(_filePath))
+            {
+                s = sr.ReadToEnd();
+            }
+            var lines = s.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+            _commands = Macro.TextParser(lines);
+        }
+        public void DoWork()
+        {
+            Macro.DoCommands(_commands);
+            //foreach (var command in _commands)
+            //{
+            //    command.DoWork();
+            //}        
+        }
+
+        public IEnumerable<ICommand> GetChildren()
+        {
+            return _commands;
+        }
+
+        public override string ToString()
+        {
+            return string.Format("COMMANDFILE {0}", _filePath);
+        }
+
+        public static ICommand Parse(string line)
+        {
             var match3 = Regex.Match(line, "^COMMANDFILE (?<path>.+)$", RegexOptions.IgnoreCase);
             if (match3.Success)
             {
                 var path = match3.Groups["path"].Value;
                 return new CommandFile(path);
             }
-        ERROR:
+            return new ParseError(line);
+        }
+    }
+    public sealed class CommandTimes : ICommand
+    {
+        //ICommand _command;
+        //int n;
+        IEnumerable<ICommand> commands;
+        public CommandTimes(ICommand command, int times)
+        {
+            //            _command = command;
+            //            n = times;
+            commands = Enumerable.Repeat<ICommand>(command, times);
+        }
+        public void DoWork()
+        {
+            //for (int i = 0; i < n; i++)
+            //{
+            //    _command.DoWork();
+            //}
+            Macro.DoCommands(commands);
+        }
+
+        public IEnumerable<ICommand> GetChildren()
+        {
+            return commands;
+        }
+
+        public static ICommand Parse(string line, ICommand lastCommand)
+        {
+            var match00 = Regex.Match(line, "^(?<times>[0-9]+)$");
+            if (match00.Success)
+            {
+                var times = int.Parse(match00.Groups["times"].Value);
+                return new CommandTimes(lastCommand, times);
+            }
+            return new ParseError(line);
+        }
+    }
+    public sealed class Comment : Nop
+    {
+        string _comment;
+        public Comment(string comment)
+        {
+            _comment = comment;
+        }
+        public override string ToString()
+        {
+            return string.Format("//{0}", _comment);
+        }
+        public static new ICommand Parse(string line)
+        {
+            var match000 = Regex.Match(line, "^//(?<comment>.*)$");
+            if (match000.Success)
+            {
+                var comment = match000.Groups["comment"].Value;
+                return new Comment(comment);
+            }
+            return new ParseError(line);
+        }
+    }
+    public class Macro
+    {
+        IEnumerable<ICommand> _commands;
+        public Macro(IEnumerable<ICommand> commands)
+        {
+            _commands = commands;
+        }
+        public static IEnumerable<ICommand> TextParser(IEnumerable<string> multiLines)
+        {
+            var _commands = new List<ICommand>();
+            ICommand lastCommand = new Nop();
+            foreach (var line in multiLines)
+            {
+                var command = Macro.TextParser(line, lastCommand);
+                _commands.Add(command);
+                lastCommand = command;
+            }
+            return _commands;
+        }
+        public static ICommand TextParser(string line, ICommand lastCommand)
+        {
+            ICommand co;
+
+            co = Nop.Parse(line);
+            if (!(co is ParseError)) return co;
+
+            co = Comment.Parse(line);
+            if (!(co is ParseError)) return co;
+
+            co = CommandTimes.Parse(line, lastCommand);
+            if (!(co is ParseError)) return co;
+
+            co = Wait.Parse(line);
+            if (!(co is ParseError)) return co;
+
+            co = Mouse.Parse(line);
+            if (!(co is ParseError)) return co;
+
+            co = CommandFile.Parse(line);
+            if (!(co is ParseError)) return co;
+
             return new ParseError(line);
         }
         public void Start()
         {
-            foreach (var command in _commands)
+            DoCommands(_commands);
+        }
+        public delegate void CommandEventHandler(object sender, CommandEventArgs e);
+        public static event CommandEventHandler CommandEvent;
+        public static void DoCommands(IEnumerable<ICommand> commands)
+        {
+            foreach (var command in commands)
             {
+                System.Diagnostics.Debug.WriteLine(command.ToString());
+                if (CommandEvent != null)
+                {
+                    var args = new CommandEventArgs();
+                    args.command = command.ToString();
+                    CommandEvent(null, args);
+                }
                 command.DoWork();
             }
         }
+    }
+    public class CommandEventArgs : EventArgs
+    {
+        public string command;
     }
 }

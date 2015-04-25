@@ -25,6 +25,22 @@ namespace WindowsFormsApplication1
             mouseHook.MouseDown += mouseHook_MouseDown;
             mouseHook.MouseUp += mouseHook_MouseUp;
             mouseHook.MouseWheel += mouseHook_MouseWheel;
+
+            Macro.CommandEvent += Macro_CommandEvent;
+        }
+
+        void Macro_CommandEvent(object sender, CommandEventArgs e)
+        {
+            Action action = () =>
+            {
+                textBox2.Text += e.command + Environment.NewLine;
+                textBox2.SelectionStart = textBox2.TextLength - 1;
+                textBox2.ScrollToCaret();
+            };
+            if (this.InvokeRequired)
+                this.Invoke(action);
+            else
+                action();
         }
         System.Timers.Timer timer = new System.Timers.Timer();
         System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
@@ -44,7 +60,7 @@ namespace WindowsFormsApplication1
 
         void mouseHook_MouseWheel(object sender, MouseEventArgs e)
         {
-//            Console.WriteLine("MouseWheel {0}", e.Delta);
+            //            Console.WriteLine("MouseWheel {0}", e.Delta);
             AddWait();
             _commands.Add(new Mouse(DeviceInputApi.MouseWheelType.Vertical, e.Delta / 120));
 
@@ -52,8 +68,8 @@ namespace WindowsFormsApplication1
 
         void mouseHook_MouseDown(object sender, MouseEventArgs e)
         {
-//            Console.WriteLine("MouseDown ({0}, {1})", e.X, e.Y);
-            AddWait();            
+            //            Console.WriteLine("MouseDown ({0}, {1})", e.X, e.Y);
+            AddWait();
             _commands.Add(new Mouse(e.Button, DeviceInputApi.ActionType.Down, e.X, e.Y));
 
         }
@@ -71,8 +87,9 @@ namespace WindowsFormsApplication1
 
         private void btnEnd_Click(object sender, EventArgs e)
         {
+            AddWait();
             mouseHook.Unregist();
-            sw.Stop();            
+            sw.Stop();
 
             int lineNum = -1;
             foreach (var co in _commands)
@@ -85,7 +102,8 @@ namespace WindowsFormsApplication1
             _commands.Clear();
         }
 
-        private async void btnDoMacro_Click(object sender, EventArgs e)
+        System.Threading.Thread workerThread;
+        private void btnDoMacro_Click(object sender, EventArgs e)
         {
             btnStart.Enabled = false;
             btnEnd.Enabled = false;
@@ -93,15 +111,27 @@ namespace WindowsFormsApplication1
 
             var _commands = Macro.TextParser(textBox1.Lines);
             macro = new Macro(_commands);
-            await Task.Delay(1000);
-            await Task.Run(() =>
-            {
-                macro.Start();
-            });
+            //await Task.Delay(1000);
 
+            //await Task.Run(() =>
+            //{
+            //    macro.Start();
+            //});
+            //macro.Start();
+            workerThread = new System.Threading.Thread(macro.Start);
+            workerThread.Start();
             btnStart.Enabled = true;
             btnEnd.Enabled = true;
             btnDoMacro.Enabled = true;
+        }
+
+        private void btnStopMacro_Click(object sender, EventArgs e)
+        {
+            if (workerThread != null)
+            {
+                workerThread.Abort();
+                workerThread = null;
+            }
         }
     }
 }
