@@ -7,12 +7,14 @@ using System.Windows.Forms;
 using System.Threading;
 using System.IO;
 using ryu_s.DeviceHook;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 namespace ryu_s.Macro
 {
     public interface ICommand
     {
         void DoWork();
+        //名前が適切ではないかも。
         IEnumerable<ICommand> GetChildren();
     }
 
@@ -168,16 +170,49 @@ namespace ryu_s.Macro
     }
     public sealed class Keyboard : ICommand
     {
-        public Keyboard(int vKey, DeviceInputApi.ActionType type)
+        Keys _key;
+        DeviceInputApi.ActionType _type;
+        public Keyboard(Keys key, DeviceInputApi.ActionType type)
         {
+            _key = key;
+            _type = type;
         }
         public void DoWork()
         {
-
+            DeviceInputApi.ActionKeyboard(_key, _type);
         }
         public IEnumerable<ICommand> GetChildren()
         {
             return new List<ICommand>();
+        }
+        public override string ToString()
+        {
+            var keyA = (Keys)((int)_key & 0xFF);//remove modifier keys
+            return string.Format("KEY_{0}_{1}", keyA.ToString(), _type);
+        }
+        public static ICommand Parse(string line)
+        {
+            var match = Regex.Match(line, "^KEY_(?<key>[a-zA-Z]+)_(?<type>[a-zA-Z]+)$", RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                var keyStr = match.Groups["key"].Value;
+                Keys keys;
+                var b = Enum.TryParse<Keys>(keyStr, true, out keys);
+                if (!b)                
+                    goto ERROR;
+                var typeStr = match.Groups["type"].Value.ToUpper();
+                DeviceInputApi.ActionType type;
+                if (typeStr == "DOWN")
+                    type = DeviceInputApi.ActionType.Down;
+                else if (typeStr == "UP")
+                    type = DeviceInputApi.ActionType.Up;
+                else
+                    goto ERROR;              
+
+                return new Keyboard(keys, type);
+            }
+            ERROR:
+            return new ParseError(line);
         }
     }
     public class Nop : ICommand
@@ -198,7 +233,7 @@ namespace ryu_s.Macro
         }
         public static ICommand Parse(string line)
         {
-            if (string.IsNullOrWhiteSpace(line))
+            if (line.ToUpper() == "NOP" || string.IsNullOrWhiteSpace(line))
             {
                 return new Nop();
             }
@@ -273,12 +308,13 @@ namespace ryu_s.Macro
     public sealed class CommandTimes : ICommand
     {
         //ICommand _command;
-        //int n;
+        int _times;
         IEnumerable<ICommand> commands;
         public CommandTimes(ICommand command, int times)
         {
             //            _command = command;
             //            n = times;
+            _times = times;
             commands = Enumerable.Repeat<ICommand>(command, times);
         }
         public void DoWork()
@@ -304,6 +340,11 @@ namespace ryu_s.Macro
                 return new CommandTimes(lastCommand, times);
             }
             return new ParseError(line);
+        }
+
+        public override string ToString()
+        {
+            return string.Format("{0}", _times);
         }
     }
     public sealed class Comment : Nop
@@ -366,6 +407,9 @@ namespace ryu_s.Macro
             co = Mouse.Parse(line);
             if (!(co is ParseError)) return co;
 
+            co = Keyboard.Parse(line);
+            if (!(co is ParseError)) return co;
+
             co = CommandFile.Parse(line);
             if (!(co is ParseError)) return co;
 
@@ -390,6 +434,91 @@ namespace ryu_s.Macro
                 }
                 command.DoWork();
             }
+        }
+    }
+
+    public class MacroRecoder
+    {
+        List<ICommand> commands = new List<ICommand>();
+        GlobalMouseHook mouseHook = new GlobalMouseHook();
+        GlobalKeyListener keyHook = new GlobalKeyListener();
+        public MacroRecoder()
+        {
+            mouseHook.MouseDown += mouseHook_MouseDown;
+            mouseHook.MouseUp += mouseHook_MouseUp;
+            mouseHook.MouseDClick += mouseHook_MouseDClick;
+            mouseHook.MouseWheel += mouseHook_MouseWheel;
+            mouseHook.MouseHWheel += mouseHook_MouseHWheel;
+
+            keyHook.AllKeyDown += keyHook_AllKeyDown;
+            keyHook.AllKeyUp += keyHook_AllKeyUp;
+        }
+        public void Start()
+        {
+            commands.Clear();
+
+            mouseHook.Regist();
+            keyHook.Regist();
+
+            sw.Start();
+        }
+
+        void mouseHook_MouseHWheel(object sender, MouseEventArgs e)
+        {
+            AddWait();
+            commands.Add(new Mouse(DeviceInputApi.MouseWheelType.Horizontal, e.Delta / 120));
+        }
+
+        void mouseHook_MouseWheel(object sender, MouseEventArgs e)
+        {
+            AddWait();
+            commands.Add(new Mouse(DeviceInputApi.MouseWheelType.Vertical, e.Delta / 120));
+        }
+
+        void mouseHook_MouseDClick(object sender, MouseEventArgs e)
+        {
+            //TODO:
+        }
+
+        void mouseHook_MouseUp(object sender, MouseEventArgs e)
+        {
+            AddWait();
+            commands.Add(new Mouse(e.Button, DeviceInputApi.ActionType.Up, e.X, e.Y));
+        }
+
+        void mouseHook_MouseDown(object sender, MouseEventArgs e)
+        {
+            AddWait();
+            commands.Add(new Mouse(e.Button, DeviceInputApi.ActionType.Down, e.X, e.Y));
+        }
+
+        void keyHook_AllKeyUp(object sender, MyKeyEventArgs e)
+        {
+            AddWait();
+            commands.Add(new Keyboard(e.Key, DeviceInputApi.ActionType.Up));
+            Debug.WriteLine(e.Key.ToString());
+        }
+
+        void keyHook_AllKeyDown(object sender, MyKeyEventArgs e)
+        {
+            AddWait();
+            commands.Add(new Keyboard(e.Key, DeviceInputApi.ActionType.Down));
+            Debug.WriteLine(e.Key.ToString());
+        }
+        System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+        private void AddWait()
+        {
+            var milliSec = sw.ElapsedMilliseconds;
+            commands.Add(new Wait((int)milliSec));
+            sw.Reset();
+            sw.Start();
+        }
+        public IEnumerable<ICommand> End()
+        {
+            sw.Stop();
+            mouseHook.Unregist();
+            keyHook.Unregist();
+            return commands;
         }
     }
     public class CommandEventArgs : EventArgs

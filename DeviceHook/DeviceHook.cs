@@ -157,6 +157,7 @@ namespace ryu_s.DeviceHook
     }
     public class KeyboardHook : DeviceHook
     {
+
         public enum KeyEventType
         {
             Up,
@@ -232,11 +233,11 @@ namespace ryu_s.DeviceHook
             }
             var key = (Keys)kb.vkCode;
             if (isPressingAlt)
-                key &= Keys.Alt;
+                key |= Keys.Alt;
             if (isPressingControl)
-                key &= Keys.Control;
+                key |= Keys.Control;
             if (isPressingShift)
-                key &= Keys.Shift;
+                key |= Keys.Shift;
             KeyStateChanged(type, key);
         }
     }
@@ -325,11 +326,11 @@ namespace ryu_s.DeviceHook
             UnhookWindowsHookEx();
         }
         private void OnEvent(MouseEventHandler e, MouseButtons buttons, int clicks, int x, int y, int delta)
-        {            
+        {
             var args = new MouseEventArgs(buttons, clicks, x, y, delta);
             if (e != null)
             {
-//                Debug.WriteLine("{0} {1} {2} {3} {4} {5}", e.ToString(), buttons.ToString(), clicks, x, y, delta);
+                //                Debug.WriteLine("{0} {1} {2} {3} {4} {5}", e.ToString(), buttons.ToString(), clicks, x, y, delta);
                 e(this, args);
             }
         }
@@ -426,10 +427,13 @@ namespace ryu_s.DeviceHook
     {
         public event KeyEventHandler KeyDown;
         public event KeyEventHandler KeyUp;
+        public event KeyEventHandler AllKeyDown;
+        public event KeyEventHandler AllKeyUp;
+
         List<KeyValuePair<KeyEventType, Keys>> listeningKeys = new List<KeyValuePair<KeyEventType, Keys>>();
         public GlobalKeyListener()
         {
-            Regist();
+//            Regist();
         }
         public void Add(KeyEventType type, Keys key)
         {
@@ -443,11 +447,16 @@ namespace ryu_s.DeviceHook
         protected override void KeyStateChanged(KeyboardHook.KeyEventType type, Keys key)
         {
             base.KeyStateChanged(type, key);
+            var args = new MyKeyEventArgs(key);
+            if (AllKeyDown != null && type == KeyEventType.Down)
+                AllKeyDown(this, args);
+            else if (AllKeyUp != null && type == KeyEventType.Up)
+                AllKeyUp(this, args);
             foreach (var checkPair in listeningKeys)
             {
                 if (checkPair.Value == key && checkPair.Key == type)
                 {
-                    var args = new MyKeyEventArgs(key);
+
                     if (KeyDown != null && type == KeyEventType.Down)
                         KeyDown(this, args);
                     else if (KeyUp != null && type == KeyEventType.Up)

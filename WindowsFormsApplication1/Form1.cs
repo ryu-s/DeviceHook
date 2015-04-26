@@ -14,19 +14,26 @@ namespace WindowsFormsApplication1
 {
     public partial class Form1 : Form
     {
-        GlobalMouseHook mouseHook = new GlobalMouseHook();
         Macro macro;
-        List<ICommand> _commands = new List<ICommand>();
+        MacroRecoder rec = new MacroRecoder();
+        BackgroundWorker bw = new BackgroundWorker();
         public Form1()
         {
             InitializeComponent();
 
-            mouseHook.MouseDClick += mouseHook_MouseDClick;
-            mouseHook.MouseDown += mouseHook_MouseDown;
-            mouseHook.MouseUp += mouseHook_MouseUp;
-            mouseHook.MouseWheel += mouseHook_MouseWheel;
-
             Macro.CommandEvent += Macro_CommandEvent;
+
+            bw.WorkerSupportsCancellation = true;
+            bw.DoWork += bw_DoWork;
+            bw.RunWorkerCompleted += bw_RunWorkerCompleted;
+
+
+            btnStart.Enabled = true;
+            btnEnd.Enabled = false;
+            btnDoMacro.Enabled = true;
+            btnStopMacro.Enabled = false;
+
+
         }
 
         void Macro_CommandEvent(object sender, CommandEventArgs e)
@@ -42,96 +49,68 @@ namespace WindowsFormsApplication1
             else
                 action();
         }
-        System.Timers.Timer timer = new System.Timers.Timer();
-        System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
-        private void AddWait()
-        {
-            var milliSec = sw.ElapsedMilliseconds;
-            _commands.Add(new Wait((int)milliSec));
-            sw.Reset();
-            sw.Start();
-        }
-        void mouseHook_MouseUp(object sender, MouseEventArgs e)
-        {
-            AddWait();
-            _commands.Add(new Mouse(e.Button, DeviceInputApi.ActionType.Up, e.X, e.Y));
 
-        }
-
-        void mouseHook_MouseWheel(object sender, MouseEventArgs e)
-        {
-            //            Console.WriteLine("MouseWheel {0}", e.Delta);
-            AddWait();
-            _commands.Add(new Mouse(DeviceInputApi.MouseWheelType.Vertical, e.Delta / 120));
-
-        }
-
-        void mouseHook_MouseDown(object sender, MouseEventArgs e)
-        {
-            //            Console.WriteLine("MouseDown ({0}, {1})", e.X, e.Y);
-            AddWait();
-            _commands.Add(new Mouse(e.Button, DeviceInputApi.ActionType.Down, e.X, e.Y));
-
-        }
-
-        void mouseHook_MouseDClick(object sender, MouseEventArgs e)
-        {
-            Console.WriteLine(e.Button.ToString());
-        }
         private void btnStart_Click(object sender, EventArgs e)
         {
+            btnStart.Enabled = false;
+            btnEnd.Enabled = true;
             textBox1.Text = "";
-            mouseHook.Regist();
-            sw.Start();
+            rec.Start();
         }
 
         private void btnEnd_Click(object sender, EventArgs e)
         {
-            AddWait();
-            mouseHook.Unregist();
-            sw.Stop();
+
+            var recodedCommands = rec.End();
 
             int lineNum = -1;
-            foreach (var co in _commands)
+            foreach (var co in recodedCommands)
             {
                 lineNum++;
-                if (lineNum + 4 >= _commands.Count)//最後の4行は記録終了ボタンを押す時のものだから無視する。
+                if (lineNum + 4 >= recodedCommands.Count())//最後の4行は記録終了ボタンを押す時のものだから無視する。
                     continue;
                 textBox1.Text += co.ToString() + Environment.NewLine;
             }
-            _commands.Clear();
-        }
 
-        System.Threading.Thread workerThread;
+            btnStart.Enabled = true;
+            btnEnd.Enabled = false;
+        }
+        
+        IEnumerable<ICommand> bw_commands;
         private void btnDoMacro_Click(object sender, EventArgs e)
         {
             btnStart.Enabled = false;
             btnEnd.Enabled = false;
             btnDoMacro.Enabled = false;
+            btnStopMacro.Enabled = true;
 
-            var _commands = Macro.TextParser(textBox1.Lines);
-            macro = new Macro(_commands);
-            //await Task.Delay(1000);
+            bw_commands = Macro.TextParser(textBox1.Lines);
 
-            //await Task.Run(() =>
-            //{
-            //    macro.Start();
-            //});
-            //macro.Start();
-            workerThread = new System.Threading.Thread(macro.Start);
-            workerThread.Start();
-            btnStart.Enabled = true;
-            btnEnd.Enabled = true;
-            btnDoMacro.Enabled = true;
+            bw.RunWorkerAsync();
+        }
+
+        void bw_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            Completed();
+        }
+
+        void bw_DoWork(object sender, DoWorkEventArgs e)
+        {
+            macro = new Macro(bw_commands);
+            macro.Start();
         }
 
         private void btnStopMacro_Click(object sender, EventArgs e)
         {
-            if (workerThread != null)
-            {
-                workerThread.Abort();
-                workerThread = null;
-            }
+            bw.CancelAsync();
+            Completed();
+        }
+        private void Completed()
+        {
+            btnStart.Enabled = true;
+            btnEnd.Enabled = false;
+            btnDoMacro.Enabled = true;
+            btnStopMacro.Enabled = false;
         }
     }
 }

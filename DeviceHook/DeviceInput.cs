@@ -259,6 +259,19 @@ namespace ryu_s.DeviceHook
 
             SendInput(list);
         }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key">Modifierは無視される</param>
+        /// <param name="type"></param>
+        public static void ActionKeyboard(Keys key, ActionType type)
+        {
+            InputUnion union = new InputUnion();
+            union.ki.wVk = (VirtualKeyShort)(int)key;//TODO:この変換が常に上手くいくかテストしてない。Keys.A|Keys.Controlの場合とか。
+            union.ki.dwFlags = (type == ActionType.Up) ? KEYEVENTF.KEYUP : 0;
+            var input = new INPUT { type = INPUT_TYPE.INPUT_KEYBOARD, U = union };
+            SendInput(new[] { input });
+        }
         private enum INPUT_TYPE : uint
         {
             INPUT_MOUSE = 0,
