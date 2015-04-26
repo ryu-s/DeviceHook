@@ -187,12 +187,12 @@ namespace ryu_s.Macro
         }
         public override string ToString()
         {
-            var keyA = (Keys)((int)_key & 0xFF);//remove modifier keys
-            return string.Format("KEY_{0}_{1}", keyA.ToString(), _type);
+            var key = (Keys)((int)_key & 0xFF);//remove modifier keys
+            return string.Format("KEY_{0}_{1}", key.ToString(), _type);
         }
         public static ICommand Parse(string line)
         {
-            var match = Regex.Match(line, "^KEY_(?<key>[a-zA-Z]+)_(?<type>[a-zA-Z]+)$", RegexOptions.IgnoreCase);
+            var match = Regex.Match(line, "^KEY_(?<key>.+)_(?<type>[a-zA-Z]+)$", RegexOptions.IgnoreCase);
             if (match.Success)
             {
                 var keyStr = match.Groups["key"].Value;
