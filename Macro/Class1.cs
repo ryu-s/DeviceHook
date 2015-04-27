@@ -20,18 +20,18 @@ namespace ryu_s.Macro
 
     public sealed class Wait : ICommand
     {
-        int waitTime;
+        public int WaitTime { get; private set; }
         public Wait(int milliseconds)
         {
-            waitTime = milliseconds;
+            WaitTime = milliseconds;
         }
         public void DoWork()
         {
-            Thread.Sleep(waitTime);
+            Thread.Sleep(WaitTime);
         }
         public override string ToString()
         {
-            return string.Format("WAIT {0}", waitTime);
+            return string.Format("WAIT {0}", WaitTime);
         }
         public static ICommand Parse(string line)
         {
@@ -67,14 +67,23 @@ namespace ryu_s.Macro
             s = string.Format("MOUSE_MOVE {0} {1}", _x, _y);
         }
         bool bWheel = false;
+        bool bHWheel = false;
         int _amount;
         DeviceInputApi.MouseWheelType _wheelType;
         public Mouse(DeviceInputApi.MouseWheelType wheelType, int amount)
         {
-            bWheel = true;
             _amount = amount;
             _wheelType = wheelType;
-            s = string.Format("MOUSE_WHEEL {0}", _amount);
+            if (_wheelType == DeviceInputApi.MouseWheelType.Horizontal)
+            {
+                bHWheel = true;
+                s = string.Format("MOUSE_HWHEEL {0}", _amount);
+            }
+            else
+            {
+                bWheel = true;
+                s = string.Format("MOUSE_WHEEL {0}", _amount);
+            }
         }
         MouseButtons _button;
         DeviceInputApi.ActionType _type;
@@ -95,7 +104,7 @@ namespace ryu_s.Macro
             {
                 DeviceInputApi.MoveMouse(_x, _y);
             }
-            else if (bWheel)
+            else if (bWheel || bHWheel)
             {
                 DeviceInputApi.MoveMouseWheel(_wheelType, _amount * 120);
             }
@@ -158,11 +167,24 @@ namespace ryu_s.Macro
                 var y = int.Parse(match1.Groups["y"].Value);
                 return new Mouse(button, type, x, y);
             }
-            var match2 = Regex.Match(line, "^MOUSE_WHEEL (?<amount>[-0-9]+)$");
+            var match2 = Regex.Match(line, "^MOUSE_WHEEL (?<amount>[-0-9]+)$", RegexOptions.IgnoreCase);
             if (match2.Success)
             {
                 var amount = int.Parse(match2.Groups["amount"].Value);
                 return new Mouse(DeviceInputApi.MouseWheelType.Vertical, amount);
+            }
+            var match3 = Regex.Match(line, "^MOUSE_HWHEEL (?<amount>[-0-9]+)$", RegexOptions.IgnoreCase);
+            if (match3.Success)
+            {
+                var amount = int.Parse(match3.Groups["amount"].Value);
+                return new Mouse(DeviceInputApi.MouseWheelType.Horizontal, amount);
+            }
+            var match4 = Regex.Match(line, "^MOUSE_MOVE (?<x>[-0-9]+) (?<y>[-0-9]+)$");
+            if (match4.Success)
+            {
+                var x = int.Parse(match4.Groups["x"].Value);
+                var y = int.Parse(match4.Groups["y"].Value);
+                return new Mouse(x, y);
             }
         ERROR:
             return new ParseError(line);
@@ -376,6 +398,23 @@ namespace ryu_s.Macro
         {
             _commands = commands;
         }
+        private static long TimeInternal(IEnumerable<ICommand> commands, long acc)
+        {
+            foreach (var command in commands)
+            {
+                var wait = command as Wait;
+                if (wait != null)
+                    acc += wait.WaitTime;
+                acc += TimeInternal(command.GetChildren(), 0);
+            }
+            return acc;
+        }
+        public static TimeSpan Time(IEnumerable<ICommand> commands)
+        {
+            long millisec = TimeInternal(commands, 0);
+
+            return TimeSpan.FromMilliseconds(millisec);
+        }
         public static IEnumerable<ICommand> TextParser(IEnumerable<string> multiLines)
         {
             var _commands = new List<ICommand>();
@@ -388,7 +427,7 @@ namespace ryu_s.Macro
             }
             return _commands;
         }
-        public static ICommand TextParser(string line, ICommand lastCommand)
+        private static ICommand TextParser(string line, ICommand lastCommand)
         {
             ICommand co;
 
@@ -425,7 +464,6 @@ namespace ryu_s.Macro
         {
             foreach (var command in commands)
             {
-                System.Diagnostics.Debug.WriteLine(command.ToString());
                 if (CommandEvent != null)
                 {
                     var args = new CommandEventArgs();
@@ -442,16 +480,25 @@ namespace ryu_s.Macro
         List<ICommand> commands = new List<ICommand>();
         GlobalMouseHook mouseHook = new GlobalMouseHook();
         GlobalKeyListener keyHook = new GlobalKeyListener();
-        public MacroRecoder()
+        public MacroRecoder(bool mouseMove = false)
         {
             mouseHook.MouseDown += mouseHook_MouseDown;
             mouseHook.MouseUp += mouseHook_MouseUp;
             mouseHook.MouseDClick += mouseHook_MouseDClick;
             mouseHook.MouseWheel += mouseHook_MouseWheel;
             mouseHook.MouseHWheel += mouseHook_MouseHWheel;
+            if(mouseMove)
+                mouseHook.MouseMove += mouseHook_MouseMove;
 
             keyHook.AllKeyDown += keyHook_AllKeyDown;
             keyHook.AllKeyUp += keyHook_AllKeyUp;
+        }
+
+        void mouseHook_MouseMove(object sender, MouseEventArgs e)
+        {
+            //記録したものを再生しても実際の動きと若干ずれてしまう。
+            AddWait();
+            commands.Add(new Mouse(e.X, e.Y));
         }
         public void Start()
         {

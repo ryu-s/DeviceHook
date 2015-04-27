@@ -15,7 +15,7 @@ namespace WindowsFormsApplication1
     public partial class Form1 : Form
     {
         Macro macro;
-        MacroRecoder rec = new MacroRecoder();
+        MacroRecoder rec = new MacroRecoder(true);
         BackgroundWorker bw = new BackgroundWorker();
         public Form1()
         {
@@ -85,7 +85,8 @@ namespace WindowsFormsApplication1
             btnStopMacro.Enabled = true;
 
             bw_commands = Macro.TextParser(textBox1.Lines);
-
+            var timeSpan = Macro.Time(bw_commands);
+            label1.Text = timeSpan.ToString("c");
             bw.RunWorkerAsync();
         }
 
@@ -111,6 +112,17 @@ namespace WindowsFormsApplication1
             btnEnd.Enabled = false;
             btnDoMacro.Enabled = true;
             btnStopMacro.Enabled = false;
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            textBox1.Text = Properties.Settings.Default.Commands;
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            Properties.Settings.Default.Commands = textBox1.Text;
+            Properties.Settings.Default.Save();
         }
     }
 }

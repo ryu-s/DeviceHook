@@ -22,5 +22,17 @@ namespace WindowsFormsApplication1.Properties {
                 return defaultInstance;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string Commands {
+            get {
+                return ((string)(this["Commands"]));
+            }
+            set {
+                this["Commands"] = value;
+            }
+        }
     }
 }

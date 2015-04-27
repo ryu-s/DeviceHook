@@ -157,7 +157,6 @@ namespace ryu_s.DeviceHook
     }
     public class KeyboardHook : DeviceHook
     {
-
         public enum KeyEventType
         {
             Up,
@@ -327,10 +326,10 @@ namespace ryu_s.DeviceHook
         }
         private void OnEvent(MouseEventHandler e, MouseButtons buttons, int clicks, int x, int y, int delta)
         {
-            var args = new MouseEventArgs(buttons, clicks, x, y, delta);
             if (e != null)
             {
                 //                Debug.WriteLine("{0} {1} {2} {3} {4} {5}", e.ToString(), buttons.ToString(), clicks, x, y, delta);
+                var args = new MouseEventArgs(buttons, clicks, x, y, delta);
                 e(this, args);
             }
         }
@@ -385,6 +384,7 @@ namespace ryu_s.DeviceHook
                 case WM_MOUSEHWHEEL:
                     {
                         var delta = (short)((msLlHookStruct.mouseData >> 16) & 0xFFFF);
+                        Console.WriteLine("h:" + delta);
                         OnEvent(MouseHWheel, MouseButtons.None, 0, currentX, currentY, delta);
                     }
                     break;
