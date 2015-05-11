@@ -34,5 +34,29 @@ namespace WindowsFormsApplication1.Properties {
                 this["Commands"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ShowLog {
+            get {
+                return ((bool)(this["ShowLog"]));
+            }
+            set {
+                this["ShowLog"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool RecMouseMove {
+            get {
+                return ((bool)(this["RecMouseMove"]));
+            }
+            set {
+                this["RecMouseMove"] = value;
+            }
+        }
     }
 }

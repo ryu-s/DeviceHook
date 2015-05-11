@@ -35,6 +35,8 @@
             this.btnStopMacro = new System.Windows.Forms.Button();
             this.textBox2 = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
+            this.checkBoxMouseMove = new System.Windows.Forms.CheckBox();
+            this.checkBoxShowLog = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // btnStart
@@ -110,11 +112,33 @@
             this.label1.TabIndex = 6;
             this.label1.Text = "label1";
             // 
+            // checkBoxMouseMove
+            // 
+            this.checkBoxMouseMove.AutoSize = true;
+            this.checkBoxMouseMove.Location = new System.Drawing.Point(21, 70);
+            this.checkBoxMouseMove.Name = "checkBoxMouseMove";
+            this.checkBoxMouseMove.Size = new System.Drawing.Size(85, 17);
+            this.checkBoxMouseMove.TabIndex = 7;
+            this.checkBoxMouseMove.Text = "MouseMove";
+            this.checkBoxMouseMove.UseVisualStyleBackColor = true;
+            // 
+            // checkBoxShowLog
+            // 
+            this.checkBoxShowLog.AutoSize = true;
+            this.checkBoxShowLog.Location = new System.Drawing.Point(21, 234);
+            this.checkBoxShowLog.Name = "checkBoxShowLog";
+            this.checkBoxShowLog.Size = new System.Drawing.Size(71, 17);
+            this.checkBoxShowLog.TabIndex = 8;
+            this.checkBoxShowLog.Text = "ShowLog";
+            this.checkBoxShowLog.UseVisualStyleBackColor = true;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(711, 455);
+            this.Controls.Add(this.checkBoxShowLog);
+            this.Controls.Add(this.checkBoxMouseMove);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.textBox2);
             this.Controls.Add(this.btnStopMacro);
@@ -140,6 +164,8 @@
         private System.Windows.Forms.Button btnStopMacro;
         private System.Windows.Forms.TextBox textBox2;
         private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.CheckBox checkBoxMouseMove;
+        private System.Windows.Forms.CheckBox checkBoxShowLog;
     }
 }
 

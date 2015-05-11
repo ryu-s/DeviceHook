@@ -190,6 +190,36 @@ namespace ryu_s.Macro
             return new ParseError(line);
         }
     }
+    public sealed class CommandOpen : ICommand
+    {
+        readonly string _url;
+        public CommandOpen(string url)
+        {
+            _url = url;
+        }
+        public void DoWork()
+        {
+            Process.Start(_url);
+        }
+        public IEnumerable<ICommand> GetChildren()
+        {
+            return new List<ICommand>();
+        }
+        public override string ToString()
+        {
+            return string.Format("COMMANDOPEN {0}", _url);
+        }
+        public static ICommand Parse(string line)
+        {
+            var match = Regex.Match(line, "^COMMANDOPEN (?<url>https?://.+)$", RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                var url = match.Groups["url"].Value;
+                return new CommandOpen(url);
+            }
+            return new ParseError(line);
+        }
+    }
     public sealed class Keyboard : ICommand
     {
         Keys _key;
@@ -329,7 +359,6 @@ namespace ryu_s.Macro
     }
     public sealed class CommandTimes : ICommand
     {
-        //ICommand _command;
         int _times;
         IEnumerable<ICommand> commands;
         public CommandTimes(ICommand command, int times)
@@ -450,6 +479,9 @@ namespace ryu_s.Macro
             if (!(co is ParseError)) return co;
 
             co = CommandFile.Parse(line);
+            if (!(co is ParseError)) return co;
+
+            co = CommandOpen.Parse(line);
             if (!(co is ParseError)) return co;
 
             return new ParseError(line);
